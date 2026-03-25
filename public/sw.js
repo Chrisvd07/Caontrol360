@@ -30,24 +30,38 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Ignorar peticiones cross-origin (APIs externas, CDNs, etc.)
+  if (url.origin !== location.origin) return;
+
+  // Ignorar métodos que no sean GET
+  if (event.request.method !== 'GET') return;
+
+  // Ignorar rutas de API (ajusta el prefijo a tu proyecto)
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Ignorar WebSockets y extensiones del navegador
+  if (!url.protocol.startsWith('http')) return;
+
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        if (response) {
+    caches.match(event.request).then((response) => {
+      if (response) return response;
+
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
-        return fetch(event.request).then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-          return response;
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
         });
-      })
+        return response;
+      }).catch(() => {
+        // Opcional: retornar página offline si falla
+        // return caches.match('/offline.html');
+      });
+    })
   );
 });
 
