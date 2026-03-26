@@ -18,11 +18,9 @@ import { db } from '@/lib/firebase';
 /* ─────────────────────────────────────────────
    CONSTANTES
 ───────────────────────────────────────────── */
-const OPENAI_API_KEY =
-  process.env.NEXT_PUBLIC_OPENAI_KEY;
-
-const WHISPER_URL = 'https://api.openai.com/v1/audio/transcriptions';
-const CHAT_URL    = 'https://api.openai.com/v1/chat/completions';
+// ✅ Ya no se necesita OPENAI_API_KEY aquí
+const WHISPER_URL = '/api/openai/whisper';
+const CHAT_URL    = '/api/openai';
 
 /* ─────────────────────────────────────────────
    WEEKLY CONFIG
@@ -168,7 +166,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
 
   const draftRef = useRef<SolicitudDraft>({ type: null, amount: null, description: null });
 
-  // Whisper recording — único micrófono
   const [isRecording, setIsRecording]       = useState(false);
   const [previewUrl, setPreviewUrl]         = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -235,17 +232,14 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
   }, [messages, isTyping]);
 
   /* ══════════════════════════════════════════
-     GPT CALL
+     GPT CALL — ✅ sin Authorization header
   ══════════════════════════════════════════ */
   const callGPT = useCallback(async (userText: string): Promise<GPTResponse> => {
     gptHistory.current.push({ role: 'user', content: userText });
 
     const res = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization:  `Bearer ${OPENAI_API_KEY}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model:       'gpt-4o-mini',
         max_tokens:  500,
@@ -467,12 +461,9 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
   const toggleMute = () => { voiceService.stopSpeaking?.(); setIsMuted(m => !m); };
 
   /* ══════════════════════════════════════════
-     WHISPER RECORDING — único micrófono
-     ✅ FIX: Verificación de contexto seguro
-             + mensajes de error específicos
+     WHISPER RECORDING
   ══════════════════════════════════════════ */
   const toggleRecord = async () => {
-    // Si ya está grabando, detener
     if (isRecording) {
       mediaRecorderRef.current?.stop();
       setIsRecording(false);
@@ -480,12 +471,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
       return;
     }
 
-    // ── CORRECCIÓN PRINCIPAL ──────────────────────────────────────────────
-    // navigator.mediaDevices es `undefined` cuando la página se sirve por
-    // HTTP (contexto inseguro). El navegador solo expone esta API en HTTPS
-    // o en localhost. Sin este check, el código lanza:
-    // "Cannot read properties of undefined (reading 'getUserMedia')"
-    // ─────────────────────────────────────────────────────────────────────
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
       toast.error(
         'El micrófono requiere conexión segura (HTTPS). Accede al sitio por https:// e intenta de nuevo.',
@@ -524,14 +509,13 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
       }, 1000);
     } catch (err: any) {
-      // ── Mensajes específicos por tipo de DOMException ──────────────────
       const errName = err?.name ?? '';
       const msg =
-        errName === 'NotAllowedError'       ? 'Permiso de micrófono denegado. Habilítalo en la configuración del navegador.' :
-        errName === 'NotFoundError'         ? 'No se encontró ningún micrófono en este dispositivo.' :
-        errName === 'NotReadableError'      ? 'El micrófono está en uso por otra aplicación.' :
-        errName === 'OverconstrainedError'  ? 'Las restricciones de audio no son compatibles con tu dispositivo.' :
-        errName === 'SecurityError'         ? 'Acceso al micrófono bloqueado por política de seguridad del sitio.' :
+        errName === 'NotAllowedError'      ? 'Permiso de micrófono denegado. Habilítalo en la configuración del navegador.' :
+        errName === 'NotFoundError'        ? 'No se encontró ningún micrófono en este dispositivo.' :
+        errName === 'NotReadableError'     ? 'El micrófono está en uso por otra aplicación.' :
+        errName === 'OverconstrainedError' ? 'Las restricciones de audio no son compatibles con tu dispositivo.' :
+        errName === 'SecurityError'        ? 'Acceso al micrófono bloqueado por política de seguridad del sitio.' :
         `No se pudo acceder al micrófono: ${err?.message ?? err}`;
       toast.error(msg, { duration: 5000 });
     }
@@ -539,6 +523,9 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
 
   const cancelAudio = () => { recordedBlobRef.current = null; setPreviewUrl(null); };
 
+  /* ══════════════════════════════════════════
+     SEND AUDIO — ✅ sin Authorization header
+  ══════════════════════════════════════════ */
   const sendAudio = async () => {
     const blob = recordedBlobRef.current;
     if (!blob) return;
@@ -558,9 +545,9 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
 
       const wRes = await fetch(WHISPER_URL, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${OPENAI_API_KEY}` },
-        body: form,
+        body: form, // ✅ sin Authorization header
       });
+
       if (!wRes.ok) {
         const e = await wRes.json().catch(() => ({}));
         throw new Error(e?.error?.message ?? `Whisper ${wRes.status}`);
@@ -598,14 +585,13 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
   };
 
   /* ══════════════════════════════════════════
-     RENDER
+     RENDER — sin cambios
   ══════════════════════════════════════════ */
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap');
 
-        /* ── palette variables ── */
         .cb-panel {
           --ink:  #04080f;
           --ink2: #060c18;
@@ -642,7 +628,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         @media(min-width:520px){ .cb-wrap { inset:auto; bottom:1.5rem; right:1.5rem; } }
 
-        /* Panel */
         .cb-panel {
           width:100%; max-width:400px;
           height:min(640px,calc(100vh - 1.5rem));
@@ -662,14 +647,12 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           to{opacity:1;transform:none}
         }
 
-        /* Top bar — blue to red */
         .cb-topbar {
           height:2px; flex-shrink:0;
           background:linear-gradient(90deg,transparent 0%,var(--blue) 30%,var(--red) 70%,transparent 100%);
           opacity:.75;
         }
 
-        /* Header */
         .cb-header {
           display:flex; align-items:center; gap:.75rem;
           padding:.875rem 1rem;
@@ -691,14 +674,12 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           width:28px; height:28px; border-radius:7px; flex-shrink:0;
           border:1px solid var(--w08); background:none;
           display:flex; align-items:center; justify-content:center;
-          cursor:pointer; color:var(--w2);
-          transition:all .15s;
+          cursor:pointer; color:var(--w2); transition:all .15s;
         }
         .cb-hbtn:hover { border-color:var(--blue-border); color:var(--blue2); background:var(--blue-dim); }
         .cb-hbtn.muted { color:var(--red2); border-color:var(--red-border); }
         .cb-hbtn.cls:hover { border-color:var(--red-border); color:var(--red2); background:var(--red-dim); }
 
-        /* Messages */
         .cb-msgs {
           flex:1; overflow-y:auto; padding:1rem;
           display:flex; flex-direction:column; gap:.5rem;
@@ -732,7 +713,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           box-shadow:0 4px 16px rgba(59,130,246,.25);
         }
 
-        /* Typing indicator */
         .cb-typing {
           display:flex; align-items:center; gap:4px;
           padding:.6rem .875rem;
@@ -754,7 +734,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           30%{opacity:1;transform:translateY(-4px)}
         }
 
-        /* Saving indicator */
         .cb-saving {
           display:flex; align-items:center; gap:.5rem;
           padding:.55rem .875rem;
@@ -766,7 +745,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           animation:cb-up .2s ease forwards; opacity:0;
         }
 
-        /* Confirm wrap */
         .cb-confirm-wrap {
           display:flex; flex-direction:column; gap:.4rem;
           align-self:flex-start;
@@ -791,8 +769,7 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         .cb-cbtn.yes {
           background:linear-gradient(135deg,#2563eb,#1d4ed8);
-          color:#fff;
-          box-shadow:0 2px 10px rgba(59,130,246,.28);
+          color:#fff; box-shadow:0 2px 10px rgba(59,130,246,.28);
         }
         .cb-cbtn.yes:hover { filter:brightness(1.1); transform:translateY(-1px); }
         .cb-cbtn.yes:disabled { opacity:.5; cursor:not-allowed; transform:none; filter:none; }
@@ -804,7 +781,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         .cb-cbtn.no:hover { background:rgba(239,68,68,.18); }
         .cb-cbtn.no:disabled { opacity:.5; cursor:not-allowed; }
 
-        /* Recording bar */
         .cb-recbar {
           display:none; align-items:center; gap:8px;
           font-size:.7rem; color:var(--red2);
@@ -820,7 +796,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         @keyframes cb-blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 
-        /* Transcribing bar */
         .cb-transcbar {
           display:none; align-items:center; gap:8px;
           font-size:.7rem; color:var(--blue2);
@@ -836,7 +811,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         @keyframes cb-spin { to{transform:rotate(360deg)} }
 
-        /* Audio preview */
         .cb-audprev {
           display:none; align-items:center; gap:8px;
           background:var(--ink3);
@@ -855,16 +829,13 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         .cb-apok:hover { transform:scale(1.04); }
         .cb-apx {
-          background:none;
-          border:1px solid var(--red-border);
-          color:var(--red2);
-          border-radius:6px; font-family:'Outfit',sans-serif;
-          font-size:.7rem; padding:4px 8px; cursor:pointer;
-          transition:all .15s;
+          background:none; border:1px solid var(--red-border);
+          color:var(--red2); border-radius:6px;
+          font-family:'Outfit',sans-serif; font-size:.7rem;
+          padding:4px 8px; cursor:pointer; transition:all .15s;
         }
         .cb-apx:hover { background:var(--red-dim); }
 
-        /* Input bar */
         .cb-inputbar {
           padding:.7rem 1rem;
           border-top:1px solid rgba(59,130,246,.08);
@@ -890,22 +861,17 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         }
         .cb-ta::placeholder { color:var(--w2); }
 
-        /* Input icon buttons */
         .cb-ib {
           width:32px; height:32px; border-radius:8px; flex-shrink:0;
           border:1px solid var(--w08); background:var(--ink4);
           display:flex; align-items:center; justify-content:center;
-          cursor:pointer; color:var(--w2);
-          transition:all .15s;
+          cursor:pointer; color:var(--w2); transition:all .15s;
         }
         .cb-ib:hover { border-color:var(--blue-border); color:var(--blue2); background:var(--blue-dim); }
         .cb-ib:disabled { opacity:.28; cursor:not-allowed; }
 
-        /* Mic recording state */
         .cb-ib.rec {
-          background:var(--red-dim);
-          border-color:var(--red-border);
-          color:var(--red2);
+          background:var(--red-dim); border-color:var(--red-border); color:var(--red2);
           animation:cb-pulsebtn 1s infinite;
         }
         @keyframes cb-pulsebtn {
@@ -913,7 +879,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           50%{ box-shadow:0 0 0 5px rgba(239,68,68,0); }
         }
 
-        /* Send button */
         .cb-send {
           background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 50%,#b91c1c 100%);
           border-color:transparent; color:#fff;
@@ -927,15 +892,13 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
           color:rgba(240,244,255,.18); margin-top:6px;
         }
 
-        /* Chips */
         .cb-chips { display:flex; flex-wrap:wrap; gap:.35rem; }
         .cb-chip {
           display:inline-flex; align-items:center; gap:.3rem;
           padding:.32rem .7rem; border-radius:999px;
           font-size:.72rem; font-weight:500;
           border:1px solid var(--blue-border);
-          background:var(--blue-dim);
-          color:var(--blue2);
+          background:var(--blue-dim); color:var(--blue2);
           cursor:pointer; font-family:'Outfit',sans-serif;
           transition:all .15s cubic-bezier(.22,1,.36,1);
         }
@@ -953,18 +916,13 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
         <div className="cb-panel">
           <div className="cb-topbar" />
 
-          {/* HEADER */}
           <div className="cb-header">
             <div className="cb-avatar"><Sparkles size={16} color="#fff" /></div>
             <div className="cb-hdr-info">
               <span className="cb-hdr-name">Asistente Control 360</span>
               <span className="cb-hdr-sub">Conversación libre · IA</span>
             </div>
-            <button
-              className={`cb-hbtn ${isMuted ? 'muted' : ''}`}
-              onClick={toggleMute}
-              title={isMuted ? 'Activar voz' : 'Silenciar'}
-            >
+            <button className={`cb-hbtn ${isMuted ? 'muted' : ''}`} onClick={toggleMute} title={isMuted ? 'Activar voz' : 'Silenciar'}>
               {isMuted ? <VolumeX size={12} /> : <Volume2 size={12} />}
             </button>
             <button className="cb-hbtn cls" onClick={handleClose} title="Cerrar">
@@ -972,7 +930,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
             </button>
           </div>
 
-          {/* MESSAGES */}
           <div className="cb-msgs">
             {messages.map(msg => {
               const isConfirmMsg = msg.role === 'bot' && msg.chips?.[0] === '__confirm__';
@@ -1010,8 +967,7 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
                         const tipoMatch = REQUEST_TYPES.find(t => t.label === c);
                         return (
                           <button key={i} className="cb-chip" onClick={() => handleChip(c)}>
-                            {tipoMatch?.icon}
-                            {c}
+                            {tipoMatch?.icon}{c}
                           </button>
                         );
                       })}
@@ -1030,19 +986,15 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* INPUT BAR */}
           <div className="cb-inputbar">
-            {/* Recording status */}
             <div className={`cb-recbar ${isRecording ? 'on' : ''}`}>
               <div className="cb-recdot" />
               <span>Grabando... {recTime} — presiona el mic para detener</span>
             </div>
-            {/* Transcribing status */}
             <div className={`cb-transcbar ${isTranscribing ? 'on' : ''}`}>
               <div className="cb-tspin" />
               <span>Transcribiendo con Whisper...</span>
             </div>
-            {/* Audio preview */}
             {previewUrl && (
               <div className="cb-audprev on">
                 <span className="cb-aplbl">🎙️</span>
@@ -1062,7 +1014,6 @@ export function ChatBot({ onClose, onRequestCreated }: ChatBotProps) {
                 disabled={isTyping || isSaving}
                 rows={1}
               />
-              {/* Único botón de micrófono — Whisper */}
               <button
                 className={`cb-ib ${isRecording ? 'rec' : ''}`}
                 onClick={toggleRecord}
