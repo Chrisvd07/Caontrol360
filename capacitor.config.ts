@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const serverUrl = process.env.CAPACITOR_SERVER_URL;
+const serverUrl = process.env.CAPACITOR_SERVER_URL ?? 'https://control360-smoky.vercel.app';
 
 const config: CapacitorConfig = {
   appId: 'com.caontrol360.app',
@@ -16,11 +16,9 @@ const config: CapacitorConfig = {
   },
 };
 
-if (serverUrl) {
-  config.server = {
-    url: serverUrl,
-    cleartext: serverUrl.startsWith('http://'),
-  };
-}
+config.server = {
+  url: serverUrl,
+  cleartext: serverUrl.startsWith('http://'),
+};
 
 export default config;

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "189538372541",
+    "project_id": "gastos-c0221",
+    "storage_bucket": "gastos-c0221.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:189538372541:android:cbea184ad3a0352322e0d4",
+        "android_client_info": {
+          "package_name": "com.caontrol360.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoe5OSQ6gVoyY83gEGkXIp5n_wlCPFEv4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
