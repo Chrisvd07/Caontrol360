@@ -5,10 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:web": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "cap:sync": "npx cap sync android",
+    "cap:open:android": "npx cap open android",
+    "apk:debug": "npm run build:web && npm run cap:sync && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/push-notifications": "^8.0.3",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",

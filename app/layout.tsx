@@ -72,6 +72,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               if ('serviceWorker' in navigator) {
+                const isCapacitor = !!window.Capacitor;
+                if (isCapacitor) return;
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(function(registration) {
                     console.log('SW registered: ', registration);

@@ -28,11 +28,17 @@ export function NotificationsPanel({ userId }: NotificationsPanelProps) {
 
   useEffect(() => {
     if (!userId) return;
+    let unsubForeground: (() => void) | undefined;
     load();
-    initFCM(userId);
-    listenForegroundMessages(userId, () => { load(); });
+    void initFCM(userId);
+    void listenForegroundMessages(userId, () => { load(); }).then((cleanup) => {
+      unsubForeground = cleanup;
+    });
     const iv = setInterval(load, 30000);
-    return () => clearInterval(iv);
+    return () => {
+      clearInterval(iv);
+      if (unsubForeground) unsubForeground();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 

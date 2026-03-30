@@ -1,6 +1,5 @@
 // lib/notify.ts
-// Helper para disparar notificaciones desde cualquier parte de tu app Next.js.
-// Llama a la API Route interna — nunca expone credenciales al cliente.
+// ✅ ARCHIVO MEJORADO - Reemplaza el tuyo con este
 
 type NotifType = 'info' | 'success' | 'warning' | 'error';
 
@@ -73,11 +72,15 @@ export async function notifyStatusChange(params: {
   };
 
   const notif = map[status];
-  if (!notif) return;
+  if (!notif) {
+    console.warn('[notify] Estado desconocido:', status);
+    return false;
+  }
 
-  await notifyUser(userId, { ...notif, data: { requestId, url } });
+  // ✅ Notificar al usuario
+  const result = await notifyUser(userId, { ...notif, data: { requestId, url } });
 
-  // Si se transfirió, también notificar al rol 'contabilidad' para que valide
+  // ✅ Si se transfirió, también notificar a contabilidad
   if (status === 'transferida') {
     await notifyRole('contabilidad', {
       title:   `📎 Factura pendiente — ${requestNumero}`,
@@ -86,9 +89,11 @@ export async function notifyStatusChange(params: {
       data:    { requestId, url },
     });
   }
+
+  return result;
 }
 
-// ─── Interno ──────────────────────────────────────────────────────────────────
+// ─── Interno: Enviar notificación por API ──────────────────────────────────
 async function sendNotify(body: Record<string, unknown>) {
   try {
     const res = await fetch('/api/notify', {
@@ -96,14 +101,50 @@ async function sendNotify(body: Record<string, unknown>) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
     });
-    if (!res.ok) console.error('[notify]', await res.text());
-    return res.ok;
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('[notify] Error en API:', res.status, errorText);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log('[notify] ✅ Enviada:', {
+      enviadas: data.sent,
+      fallidas: data.failed,
+      limpiadas: data.cleaned
+    });
+
+    return true;
+
   } catch (err) {
-    console.error('[notify] fetch error:', err);
+    console.error('[notify] Error en fetch:', err);
     return false;
   }
 }
 
+// ─── Formato de moneda ──────────────────────────────────────────────────────
 function fmt(n: number) {
-  return new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(n);
+  return new Intl.NumberFormat('es-DO', {
+    style: 'currency',
+    currency: 'DOP'
+  }).format(n);
+}
+
+// ─── Debug: Ver estado de FCM ──────────────────────────────────────────────
+export async function debugFCMStatus(userId: string) {
+  try {
+    const response = await fetch('/api/debug/fcm-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+
+    const data = await response.json();
+    console.log('[notify] FCM Status:', data);
+    return data;
+  } catch (err) {
+    console.error('[notify] Error checking FCM status:', err);
+    return null;
+  }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { NotificationsPanel } from './notifications-panel';
+import { InAppNotificationBanner } from './in-app-notification-banner';
 import {
   LogOut, Settings, User, Home, FileText,
   CheckCircle, BarChart3, Menu, X, ChevronRight
@@ -351,6 +352,7 @@ export function AppShell({ children, requiredRole }: AppShellProps) {
       `}</style>
 
       <div className="sh-root">
+        <InAppNotificationBanner />
         <header className="sh-header">
           <div className="sh-header-bar" />
           <button className="sh-burger" onClick={() => setMobileOpen(true)}><Menu size={18} /></button>
